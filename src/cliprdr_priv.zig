@@ -29,10 +29,6 @@ const CB_CLIPBOARD_CHANGED      = 0x0010;
 
 const CB_CAPSTYPE_GENERAL       = 0x0001;
 
-const CB_RESPONSE_OK            = 0x0001;
-const CB_RESPONSE_FAIL          = 0x0002;
-const CB_ASCII_NAMES            = 0x0004;
-
 // c abi struct
 pub const cliprdr_priv_t = extern struct
 {
@@ -76,7 +72,7 @@ pub const cliprdr_priv_t = extern struct
     }
 
     //*************************************************************************
-    pub fn cliprdr_process_monitor_ready(self: *cliprdr_priv_t, channel_id: u16,
+    fn cliprdr_process_monitor_ready(self: *cliprdr_priv_t, channel_id: u16,
             s: *parse.parse_t) !c_int
     {
         try self.logln(@src(), "", .{});
@@ -91,53 +87,98 @@ pub const cliprdr_priv_t = extern struct
     }
 
     //*************************************************************************
-    pub fn cliprdr_process_format_list(self: *cliprdr_priv_t, channel_id: u16,
+    fn cliprdr_process_format_list(self: *cliprdr_priv_t, channel_id: u16,
             s: *parse.parse_t, msg_flags: u16) !c_int
     {
         try self.logln(@src(), "", .{});
-        _ = msg_flags;
-        var rv: c_int = 0;
-        var num_formats: u32 = 0;
-        var formats = try self.allocator.alloc(c.cliprdr_format_t, 64);
-        defer self.allocator.free(formats);
+        var rv: c_int = c.LIBCLIPRDR_ERROR_FORMAT_LIST;
+        var formats = std.ArrayList(c.cliprdr_format_t).init(self.allocator.*);
+        defer formats.deinit();
         if ((self.general_flags & CB_USE_LONG_FORMAT_NAMES) != 0)
         {
             while (s.check_rem_bool(6))
             {
-                formats[num_formats].format_id = s.in_u32_le();
-                formats[num_formats].format_name_bytes = 0;
-                formats[num_formats].format_name = null;
-                try self.logln(@src(), "1 format_id {}", .{formats[num_formats].format_id});
-                var chr16 = s.in_u16_le();
-                while ((chr16 != 0) and s.check_rem_bool(2))
+                var format: c.cliprdr_format_t = .{};
+                format.format_id = s.in_u32_le();
+                format.format_name = &s.data[s.offset];
+                while (s.check_rem_bool(2))
                 {
-                    chr16 = s.in_u16_le();
+                    const chr16 = s.in_u16_le();
+                    format.format_name_bytes += 2;
+                    if (chr16 == 0)
+                    {
+                        break;
+                    }
                 }
-                num_formats += 1;
+                try formats.append(format);
             }
         }
         else
         {
             while (s.check_rem_bool(36))
             {
-                formats[num_formats].format_id = s.in_u32_le();
-                formats[num_formats].format_name_bytes = 0;
-                formats[num_formats].format_name = null;
-                try self.logln(@src(), "2 format_id {}", .{formats[num_formats].format_id});
+                var format: c.cliprdr_format_t = .{};
+                format.format_id = s.in_u32_le();
+                format.format_name = &s.data[s.offset];
+                format.format_name_bytes = 32;
                 s.in_u8_skip(32);
-                num_formats += 1;
+                try formats.append(format);
             }
         }
         if (self.cliprdr.format_list) |aformat_list|
         {
-            rv = aformat_list(&self.cliprdr, channel_id,
-                    num_formats, formats.ptr);
+            rv = aformat_list(&self.cliprdr, channel_id, msg_flags,
+                    @truncate(formats.items.len), formats.items.ptr);
         }
         return rv;
     }
 
     //*************************************************************************
-    pub fn cliprdr_process_caps_general(self: *cliprdr_priv_t, channel_id: u16,
+    fn cliprdr_process_format_list_response(self: *cliprdr_priv_t,
+            channel_id: u16, msg_flags: u16) !c_int
+    {
+        try self.logln(@src(), "", .{});
+        var rv: c_int = c.LIBCLIPRDR_ERROR_FORMAT_LIST_RESPONSE;
+        if (self.cliprdr.format_list_response) |aformat_list_response|
+        {
+            rv = aformat_list_response(&self.cliprdr, channel_id, msg_flags);
+        }
+        return rv;
+    }
+
+    //*************************************************************************
+    fn cliprdr_process_data_request(self: *cliprdr_priv_t,
+            channel_id: u16, s: *parse.parse_t) !c_int
+    {
+        try self.logln(@src(), "", .{});
+        var rv: c_int = c.LIBCLIPRDR_ERROR_DATA_REQUEST;
+        try s.check_rem(4);
+        const requested_format_id = s.in_u32_le();
+        if (self.cliprdr.data_request) |adata_request|
+        {
+            rv = adata_request(&self.cliprdr, channel_id, requested_format_id);
+        }
+        return rv;
+    }
+
+    //*************************************************************************
+    fn cliprdr_process_data_response(self: *cliprdr_priv_t,
+            channel_id: u16, s: *parse.parse_t, msg_flags: u16) !c_int
+    {
+        try self.logln(@src(), "", .{});
+        var rv: c_int = c.LIBCLIPRDR_ERROR_DATA_RESPONSE;
+        const bytes: u32 = @truncate(s.get_rem());
+        const data: *u8 = &s.data[s.offset];
+        if (self.cliprdr.data_response) |adata_response|
+        {
+            rv = adata_response(&self.cliprdr, channel_id, msg_flags,
+                    data, bytes);
+        }
+        return rv;
+    }
+
+    //*************************************************************************
+    fn cliprdr_process_caps_general(self: *cliprdr_priv_t, channel_id: u16,
             s: *parse.parse_t) !c_int
     {
         try s.check_rem(8);
@@ -150,7 +191,7 @@ pub const cliprdr_priv_t = extern struct
     }
 
     //*************************************************************************
-    pub fn cliprdr_process_caps(self: *cliprdr_priv_t, channel_id: u16,
+    fn cliprdr_process_caps(self: *cliprdr_priv_t, channel_id: u16,
             s: *parse.parse_t) !c_int
     {
         try self.logln(@src(), "", .{});
@@ -200,6 +241,9 @@ pub const cliprdr_priv_t = extern struct
         {
             CB_MONITOR_READY => try self.cliprdr_process_monitor_ready(channel_id, s),
             CB_FORMAT_LIST => try self.cliprdr_process_format_list(channel_id, s, msg_flags),
+            CB_FORMAT_LIST_RESPONSE => try self.cliprdr_process_format_list_response(channel_id, msg_flags),
+            CB_FORMAT_DATA_REQUEST => try self.cliprdr_process_data_request(channel_id, s),
+            CB_FORMAT_DATA_RESPONSE => try self.cliprdr_process_data_response(channel_id, s, msg_flags),
             CB_CLIP_CAPS => try self.cliprdr_process_caps(channel_id, s),
             else => c.LIBCLIPRDR_ERROR_NONE,
         };
@@ -240,6 +284,74 @@ pub const cliprdr_priv_t = extern struct
                     slice.ptr, @truncate(slice.len));
         }
         return c.LIBCLIPRDR_ERROR_SEND_CAPS;
+    }
+
+    //*************************************************************************
+    pub fn send_format_list(self: *cliprdr_priv_t, channel_id: u16,
+            msg_flags: u16, num_fomats: u32,
+            formats: [*]c.cliprdr_format_t) !c_int
+    {
+        try self.logln(@src(), "", .{});
+        _ = channel_id;
+        _ = msg_flags;
+        _ = num_fomats;
+        _ = formats;
+        return c.LIBCLIPRDR_ERROR_SEND_FORMAT_LIST;
+    }
+
+    //*************************************************************************
+    pub fn send_format_list_response(self: *cliprdr_priv_t, channel_id: u16,
+            msg_flags: u16) !c_int
+    {
+        try self.logln(@src(), "msg_flags {}", .{msg_flags});
+        const s = try parse.create(self.allocator, 64);
+        defer s.delete();
+        try s.check_rem(4);
+        s.out_u16_le(CB_FORMAT_LIST_RESPONSE);
+        s.out_u16_le(msg_flags);
+        const slice = s.get_out_slice();
+        try self.logln(@src(), "send slice len {}", .{slice.len});
+        if (self.cliprdr.send_data) |asend_data|
+        {
+            return asend_data(&self.cliprdr, channel_id,
+                    slice.ptr, @truncate(slice.len));
+        }
+        return c.LIBCLIPRDR_ERROR_FORMAT_LIST_RESPONSE;
+    }
+
+    //*************************************************************************
+    pub fn send_data_request(self: *cliprdr_priv_t, channel_id: u16,
+            requested_format_id: u32) !c_int
+    {
+        try self.logln(@src(), "requested_format_id {}",
+                .{requested_format_id});
+        const s = try parse.create(self.allocator, 64);
+        defer s.delete();
+        try s.check_rem(8);
+        s.out_u16_le(CB_FORMAT_DATA_REQUEST);
+        s.out_u16_le(0);
+        s.out_u32_le(requested_format_id);
+        const slice = s.get_out_slice();
+        try self.logln(@src(), "send slice len {}", .{slice.len});
+        if (self.cliprdr.send_data) |asend_data|
+        {
+            return asend_data(&self.cliprdr, channel_id,
+                    slice.ptr, @truncate(slice.len));
+        }
+        return c.LIBCLIPRDR_ERROR_DATA_REQUEST;
+    }
+
+    //*************************************************************************
+    pub fn send_data_response(self: *cliprdr_priv_t, channel_id: u16,
+            msg_flags: u16, requested_format_data: ?*anyopaque,
+            requested_format_data_bytes: u32) !c_int
+    {
+        try self.logln(@src(), "", .{});
+        _ = channel_id;
+        _ = msg_flags;
+        _ = requested_format_data;
+        _ = requested_format_data_bytes;
+        return c.LIBCLIPRDR_ERROR_DATA_RESPONSE;
     }
 
 };
