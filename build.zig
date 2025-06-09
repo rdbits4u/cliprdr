@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void
     ) orelse false;
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    // libsvc
+    // libcliprdr
     const libcliprdr = b.addSharedLibrary(.{
         .name = "cliprdr",
         .root_source_file = b.path("src/libcliprdr.zig"),
