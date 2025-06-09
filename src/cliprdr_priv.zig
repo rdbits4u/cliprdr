@@ -185,7 +185,7 @@ pub const cliprdr_priv_t = extern struct
         self.version = s.in_u32_le();
         self.general_flags = s.in_u32_le();
         try self.logln(@src(),
-                "channel_id {} version {} general_flags {}",
+                "channel_id 0x{X} version {} general_flags {}",
                 .{channel_id, self.version, self.general_flags});
         return c.LIBCLIPRDR_ERROR_NONE;
     }
@@ -253,7 +253,7 @@ pub const cliprdr_priv_t = extern struct
     pub fn send_capabilities(self: *cliprdr_priv_t, channel_id: u16,
             version: u32, general_flags: u32) !c_int
     {
-        try self.logln(@src(), "channel_id {} version {} general_flags {}",
+        try self.logln(@src(), "channel_id 0x{X} version {} general_flags {}",
                 .{channel_id, version, general_flags});
         if (!self.got_caps)
         {
