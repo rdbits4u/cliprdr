@@ -39,6 +39,15 @@ pub const cliprdr_priv_t = extern struct
     got_caps: bool = false,
 
     //*************************************************************************
+    pub fn create(allocator: *const std.mem.Allocator) !*cliprdr_priv_t
+    {
+        const priv: *cliprdr_priv_t = try allocator.create(cliprdr_priv_t);
+        errdefer allocator.destroy(priv);
+        priv.* = .{.allocator = allocator};
+        return priv;
+    }
+
+    //*************************************************************************
     pub fn delete(self: *cliprdr_priv_t) void
     {
         self.allocator.destroy(self);
@@ -210,7 +219,7 @@ pub const cliprdr_priv_t = extern struct
                 return c.LIBCLIPRDR_ERROR_PARSE;
             }
             try s.check_rem(lengthCapability - 4);
-            const cap_s = try parse.create_from_slice(self.allocator,
+            const cap_s = try parse.parse_t.create_from_slice(self.allocator,
                     s.in_u8_slice(lengthCapability - 4));
             defer cap_s.delete();
             rv = switch (capabilitySetType)
@@ -227,7 +236,7 @@ pub const cliprdr_priv_t = extern struct
     pub fn process_slice(self: *cliprdr_priv_t, channel_id: u16,
             slice: []u8) !c_int
     {
-        const s = try parse.create_from_slice(self.allocator, slice);
+        const s = try parse.parse_t.create_from_slice(self.allocator, slice);
         defer s.delete();
         try s.check_rem(8);
         const msg_type = s.in_u16_le();
@@ -259,7 +268,7 @@ pub const cliprdr_priv_t = extern struct
         {
             return c.LIBCLIPRDR_ERROR_SEND_CAPS;
         }
-        const s = try parse.create(self.allocator, 64);
+        const s = try parse.parse_t.create(self.allocator, 64);
         defer s.delete();
         try s.check_rem(8);
         s.push_layer(8, 0);
@@ -304,7 +313,7 @@ pub const cliprdr_priv_t = extern struct
             msg_flags: u16) !c_int
     {
         try self.logln(@src(), "msg_flags {}", .{msg_flags});
-        const s = try parse.create(self.allocator, 64);
+        const s = try parse.parse_t.create(self.allocator, 64);
         defer s.delete();
         try s.check_rem(4);
         s.out_u16_le(CB_FORMAT_LIST_RESPONSE);
@@ -325,7 +334,7 @@ pub const cliprdr_priv_t = extern struct
     {
         try self.logln(@src(), "requested_format_id {}",
                 .{requested_format_id});
-        const s = try parse.create(self.allocator, 64);
+        const s = try parse.parse_t.create(self.allocator, 64);
         defer s.delete();
         try s.check_rem(8);
         s.out_u16_le(CB_FORMAT_DATA_REQUEST);
@@ -355,12 +364,3 @@ pub const cliprdr_priv_t = extern struct
     }
 
 };
-
-//*****************************************************************************
-pub fn create(allocator: *const std.mem.Allocator) !*cliprdr_priv_t
-{
-    const priv: *cliprdr_priv_t = try allocator.create(cliprdr_priv_t);
-    errdefer allocator.destroy(priv);
-    priv.* = .{.allocator = allocator};
-    return priv;
-}

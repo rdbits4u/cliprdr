@@ -28,7 +28,7 @@ export fn cliprdr_create(cliprdr: ?**c.cliprdr_t) c_int
     // check if cliprdr is nil
     if (cliprdr) |acliprdr|
     {
-        const priv = cliprdr_priv.create(&g_allocator) catch
+        const priv = cliprdr_priv.cliprdr_priv_t.create(&g_allocator) catch
                 return c.LIBCLIPRDR_ERROR_MEMORY;
         acliprdr.* = @ptrCast(priv);
         return c.LIBCLIPRDR_ERROR_NONE;
