@@ -301,11 +301,42 @@ pub const cliprdr_priv_t = extern struct
             formats: [*]c.cliprdr_format_t) !c_int
     {
         try self.logln(@src(), "", .{});
-        _ = channel_id;
-        _ = msg_flags;
-        _ = num_fomats;
-        _ = formats;
-        return c.LIBCLIPRDR_ERROR_SEND_FORMAT_LIST;
+        const s = try parse.parse_t.create(self.allocator, 8192);
+        defer s.delete();
+        try s.check_rem(8);
+        s.push_layer(8, 0);
+        if ((self.general_flags & CB_USE_LONG_FORMAT_NAMES) != 0)
+        {
+            for (0..num_fomats) |index|
+            {
+                try s.check_rem(6);
+                s.out_u32_le(formats[index].format_id);
+                s.out_u16_le(0);
+            }
+        }
+        else
+        {
+            for (0..num_fomats) |index|
+            {
+                try s.check_rem(36);
+                s.out_u32_le(formats[index].format_id);
+                s.out_u8_skip(32);
+            }
+        }
+        s.push_layer(0, 1);
+        s.pop_layer(0);
+        s.out_u16_le(CB_FORMAT_LIST);
+        s.out_u16_le(msg_flags);
+        s.out_u32_le(s.layer_subtract(1, 0) - 8);
+        s.pop_layer(1);
+        const slice = s.get_out_slice();
+        try self.logln(@src(), "send slice len {}", .{slice.len});
+        if (self.cliprdr.send_data) |asend_data|
+        {
+            return asend_data(&self.cliprdr, channel_id,
+                    slice.ptr, @truncate(slice.len));
+        }
+        return c.LIBCLIPRDR_ERROR_FORMAT_LIST;
     }
 
     //*************************************************************************
@@ -315,9 +346,10 @@ pub const cliprdr_priv_t = extern struct
         try self.logln(@src(), "msg_flags {}", .{msg_flags});
         const s = try parse.parse_t.create(self.allocator, 64);
         defer s.delete();
-        try s.check_rem(4);
+        try s.check_rem(8);
         s.out_u16_le(CB_FORMAT_LIST_RESPONSE);
         s.out_u16_le(msg_flags);
+        s.out_u32_le(0);
         const slice = s.get_out_slice();
         try self.logln(@src(), "send slice len {}", .{slice.len});
         if (self.cliprdr.send_data) |asend_data|
@@ -336,9 +368,10 @@ pub const cliprdr_priv_t = extern struct
                 .{requested_format_id});
         const s = try parse.parse_t.create(self.allocator, 64);
         defer s.delete();
-        try s.check_rem(8);
+        try s.check_rem(12);
         s.out_u16_le(CB_FORMAT_DATA_REQUEST);
         s.out_u16_le(0);
+        s.out_u32_le(4);
         s.out_u32_le(requested_format_id);
         const slice = s.get_out_slice();
         try self.logln(@src(), "send slice len {}", .{slice.len});
@@ -356,10 +389,30 @@ pub const cliprdr_priv_t = extern struct
             requested_format_data_bytes: u32) !c_int
     {
         try self.logln(@src(), "", .{});
-        _ = channel_id;
-        _ = msg_flags;
-        _ = requested_format_data;
-        _ = requested_format_data_bytes;
+        const s = try parse.parse_t.create(self.allocator,
+                8192 + requested_format_data_bytes);
+        defer s.delete();
+        try s.check_rem(8);
+        s.push_layer(8, 0);
+        try s.check_rem(requested_format_data_bytes + 4);
+        var slice1: []u8 = undefined;
+        slice1.ptr = @ptrCast(requested_format_data);
+        slice1.len = requested_format_data_bytes;
+        s.out_u8_slice(slice1);
+        s.out_u32_le(0);
+        s.push_layer(0, 1);
+        s.pop_layer(0);
+        s.out_u16_le(CB_FORMAT_DATA_RESPONSE);
+        s.out_u16_le(msg_flags);
+        s.out_u32_le(s.layer_subtract(1, 0) - 8);
+        s.pop_layer(1);
+        const slice = s.get_out_slice();
+        try self.logln(@src(), "send slice len {}", .{slice.len});
+        if (self.cliprdr.send_data) |asend_data|
+        {
+            return asend_data(&self.cliprdr, channel_id,
+                    slice.ptr, @truncate(slice.len));
+        }
         return c.LIBCLIPRDR_ERROR_DATA_RESPONSE;
     }
 

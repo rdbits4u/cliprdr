@@ -13,13 +13,40 @@
 #define LIBCLIPRDR_ERROR_SEND_CAPS              -6
 #define LIBCLIPRDR_ERROR_FORMAT_LIST            -7
 #define LIBCLIPRDR_ERROR_FORMAT_LIST_RESPONSE   -8
-#define LIBCLIPRDR_ERROR_SEND_FORMAT_LIST       -9
+#define LIBCLIPRDR_ERROR_FORMAT_LIST            -9
 #define LIBCLIPRDR_ERROR_DATA_REQUEST           -10
 #define LIBCLIPRDR_ERROR_DATA_RESPONSE          -11
 
 #define CB_RESPONSE_OK      0x0001
 #define CB_RESPONSE_FAIL    0x0002
 #define CB_ASCII_NAMES      0x0004
+
+#define CF_TEXT                        1
+#define CF_BITMAP                      2
+#define CF_METAFILEPICT                3
+#define CF_SYLK                        4
+#define CF_DIF                         5
+#define CF_TIFF                        6
+#define CF_OEMTEXT                     7
+#define CF_DIB                         8
+#define CF_PALETTE                     9
+#define CF_PENDATA                     10
+#define CF_RIFF                        11
+#define CF_WAVE                        12
+#define CF_UNICODETEXT                 13
+#define CF_ENHMETAFILE                 14
+#define CF_HDROP                       15
+#define CF_LOCALE                      16
+#define CF_MAX                         17
+#define CF_OWNERDISPLAY                128
+#define CF_DSPTEXT                     129
+#define CF_DSPBITMAP                   130
+#define CF_DSPMETAFILEPICT             131
+#define CF_DSPENHMETAFILE              142
+#define CF_PRIVATEFIRST                512
+#define CF_PRIVATELAST                 767
+#define CF_GDIOBJFIRST                 768
+#define CF_GDIOBJLAST                  1023
 
 struct cliprdr_format_t
 {
@@ -68,6 +95,6 @@ int cliprdr_send_data_request(struct cliprdr_t* cliprdr, uint16_t channel_id,
 int cliprdr_send_data_response(struct cliprdr_t* cliprdr, uint16_t channel_id,
                                uint16_t msg_flags,
                                void* requested_format_data,
-                               int requested_format_data_bytes);
+                               uint32_t requested_format_data_bytes);
                               
 #endif

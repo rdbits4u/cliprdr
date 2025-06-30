@@ -105,9 +105,9 @@ export fn cliprdr_send_format_list(cliprdr: ?*c.cliprdr_t,
         const priv: *cliprdr_priv.cliprdr_priv_t = @ptrCast(acliprdr);
         return priv.send_format_list(channel_id, msg_flags,
                 num_formats, formats)
-                catch c.LIBCLIPRDR_ERROR_SEND_FORMAT_LIST;
+                catch c.LIBCLIPRDR_ERROR_FORMAT_LIST;
     }
-    return c.LIBCLIPRDR_ERROR_SEND_FORMAT_LIST;
+    return c.LIBCLIPRDR_ERROR_FORMAT_LIST;
 }
 
 //*****************************************************************************
@@ -149,7 +149,7 @@ export fn cliprdr_send_data_request(cliprdr: ?*c.cliprdr_t,
 // int cliprdr_send_data_response(struct cliprdr_t* cliprdr,
 //                                uint16_t channel_id, uint16_t msg_flags,
 //                                void* requested_format_data,
-//                                int requested_format_data_bytes);
+//                                uint32_t requested_format_data_bytes);
 export fn cliprdr_send_data_response(cliprdr: ?*c.cliprdr_t, channel_id: u16,
         msg_flags: u16,  requested_format_data: ?*anyopaque,
         requested_format_data_bytes: u32) c_int
