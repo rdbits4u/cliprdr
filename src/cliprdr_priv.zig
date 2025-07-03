@@ -283,7 +283,7 @@ pub const cliprdr_priv_t = extern struct
         s.pop_layer(0);
         s.out_u16_le(CB_CLIP_CAPS);
         s.out_u16_le(0);
-        s.out_u32_le(s.layer_subtract(1, 0) - 8);
+        s.out_u32_le(s.layer_subtract_u32(1, 0) - 8);
         s.pop_layer(1);
         const slice = s.get_out_slice();
         try self.logln(@src(), "send slice len {}", .{slice.len});
@@ -327,7 +327,7 @@ pub const cliprdr_priv_t = extern struct
         s.pop_layer(0);
         s.out_u16_le(CB_FORMAT_LIST);
         s.out_u16_le(msg_flags);
-        s.out_u32_le(s.layer_subtract(1, 0) - 8);
+        s.out_u32_le(s.layer_subtract_u32(1, 0) - 8);
         s.pop_layer(1);
         const slice = s.get_out_slice();
         try self.logln(@src(), "send slice len {}", .{slice.len});
@@ -404,7 +404,7 @@ pub const cliprdr_priv_t = extern struct
         s.pop_layer(0);
         s.out_u16_le(CB_FORMAT_DATA_RESPONSE);
         s.out_u16_le(msg_flags);
-        s.out_u32_le(s.layer_subtract(1, 0) - 8);
+        s.out_u32_le(s.layer_subtract_u32(1, 0) - 12);
         s.pop_layer(1);
         const slice = s.get_out_slice();
         try self.logln(@src(), "send slice len {}", .{slice.len});
