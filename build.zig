@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     // libcliprdr
-    const libcliprdr = b.addSharedLibrary(.{
+    const libcliprdr = b.addStaticLibrary(.{
         .name = "cliprdr",
         .root_source_file = b.path("src/libcliprdr.zig"),
         .target = target,
