@@ -1,9 +1,6 @@
 const std = @import("std");
 const cliprdr_priv = @import("cliprdr_priv.zig");
-const c = @cImport(
-{
-    @cInclude("libcliprdr.h");
-});
+const c = cliprdr_priv.c;
 
 var g_allocator: std.mem.Allocator = std.heap.c_allocator;
 

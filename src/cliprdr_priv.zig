@@ -1,6 +1,6 @@
 const std = @import("std");
 const parse = @import("parse");
-const c = @cImport(
+pub const c = @cImport(
 {
     @cInclude("libcliprdr.h");
 });
@@ -63,8 +63,8 @@ pub const cliprdr_priv_t = extern struct
             const alloc_buf = try std.fmt.allocPrint(self.allocator.*,
                     fmt, args);
             defer self.allocator.free(alloc_buf);
-            const alloc1_buf = try std.fmt.allocPrintZ(self.allocator.*,
-                    "cliprdr:{s}:{s}", .{src.fn_name, alloc_buf});
+            const alloc1_buf = try std.fmt.allocPrint(self.allocator.*,
+                    "cliprdr:{s}:{s}\x00", .{src.fn_name, alloc_buf});
             defer self.allocator.free(alloc1_buf);
             _ = alog_msg(&self.cliprdr, alloc1_buf.ptr);
         }
@@ -101,8 +101,9 @@ pub const cliprdr_priv_t = extern struct
     {
         try self.logln(@src(), "", .{});
         var rv: c_int = c.LIBCLIPRDR_ERROR_FORMAT_LIST;
-        var formats = std.ArrayList(c.cliprdr_format_t).init(self.allocator.*);
-        defer formats.deinit();
+        var formats = try std.ArrayListUnmanaged(c.cliprdr_format_t).initCapacity(
+                self.allocator.*, 32);
+        defer formats.deinit(self.allocator.*);
         if ((self.general_flags & CB_USE_LONG_FORMAT_NAMES) != 0)
         {
             while (s.check_rem_bool(6))
@@ -119,7 +120,7 @@ pub const cliprdr_priv_t = extern struct
                         break;
                     }
                 }
-                try formats.append(format);
+                try formats.append(self.allocator.*, format);
             }
         }
         else
@@ -131,7 +132,7 @@ pub const cliprdr_priv_t = extern struct
                 format.format_name = &s.data[s.offset];
                 format.format_name_bytes = 32;
                 s.in_u8_skip(32);
-                try formats.append(format);
+                try formats.append(self.allocator.*, format);
             }
         }
         if (self.cliprdr.format_list) |aformat_list|
