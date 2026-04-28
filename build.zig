@@ -16,9 +16,9 @@ pub fn build(b: *std.Build) void
     const libcliprdr = myAddStaticLibrary(b, "cliprdr", target,
             optimize, do_strip);
     libcliprdr.root_module.root_source_file = b.path("src/libcliprdr.zig");
-    libcliprdr.linkLibC();
-    libcliprdr.addIncludePath(b.path("../common"));
-    libcliprdr.addIncludePath(b.path("include"));
+    myLinkLibC(libcliprdr);
+    myAddIncludePath(libcliprdr, b.path("../common"));
+    myAddIncludePath(libcliprdr, b.path("include"));
     libcliprdr.root_module.addImport("parse", b.createModule(.{
         .root_source_file = b.path("../common/parse.zig"),
     }));
@@ -29,6 +29,32 @@ pub fn build(b: *std.Build) void
         .root_source_file = b.path("../common/strings.zig"),
     }));
     b.installArtifact(libcliprdr);
+}
+
+//*****************************************************************************
+fn myLinkLibC(compile: *std.Build.Step.Compile) void
+{
+    if ((builtin.zig_version.major == 0) and (builtin.zig_version.minor < 16))
+    {
+        compile.linkLibC();
+    }
+    else
+    {
+        compile.root_module.link_libc = true;
+    }
+}
+
+//*****************************************************************************
+fn myAddIncludePath(compile: *std.Build.Step.Compile, lazy_path: std.Build.LazyPath) void
+{
+    if ((builtin.zig_version.major == 0) and (builtin.zig_version.minor < 16))
+    {
+        compile.addIncludePath(lazy_path);
+    }
+    else
+    {
+        compile.root_module.addIncludePath(lazy_path);
+    }
 }
 
 //*****************************************************************************
